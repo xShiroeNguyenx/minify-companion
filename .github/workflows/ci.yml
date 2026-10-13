@@ -25,6 +25,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Only what ships in the .vsix; dev tools (vsce, eslint) are not bundled.
+      - name: Audit runtime dependencies
+        if: runner.os == 'Linux'
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Type check
         run: npm run typecheck
 

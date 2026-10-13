@@ -315,3 +315,67 @@ describe('runMinifier', () => {
     expect((await runMinifier(inp('/w/a.ts', 'x'), { loadPaths: [] })).ok).toBe(false);
   });
 });
+
+describe('minifyJs module guess fallback', () => {
+  it('retries as a script when a wrong module guess hits strict-mode rules', async () => {
+    // "export default" at the start of a line inside a template string fools the regex.
+    const src = 'var tpl = `\nexport default 1`;\nwith (o) { x = tpl; }\n';
+    expect(detectModule('/w/a.js', src)).toBe(true);
+    const r = await minifyJs(inp('/w/a.js', src));
+    expect(r.ok).toBe(true);
+  });
+
+  it('does not override an explicit module option', async () => {
+    const r = await minifyJs(inp('/w/a.js', 'with (o) { x = 1; }', { terser: { module: true } }));
+    expect(r.ok).toBe(false);
+  });
+
+  it('still reports a real syntax error at its position', async () => {
+    const r = await minifyJs(inp('/w/a.js', 'export const a = 1;\nvar = ;\n'));
+    expect(r.ok === false && r.errors[0].line).toBe(2);
+  });
+});
+
+describe('edge-case inputs', () => {
+  it('turns an empty file into an empty output', async () => {
+    for (const p of ['/w/a.js', '/w/a.css', '/w/a.html']) {
+      expect(ok(await runMinifier(inp(p, ''), { loadPaths: [] })).outputs[0].content).toBe('');
+    }
+  });
+
+  it('keeps only the license of a license-only file', async () => {
+    expect(ok(await minifyJs(inp('/w/a.js', '/*! MIT */\n'))).outputs[0].content.trim()).toBe('/*! MIT */');
+    expect(ok(await minifyCss(inp('/w/a.css', '/*! MIT */\n'))).outputs[0].content).toBe('/*! MIT */');
+  });
+
+  it('handles CRLF line endings the same as LF', async () => {
+    const js = 'var a = 1;\nwindow.b = a + 1;\n';
+    const css = '.a {\n  color: red;\n}\n';
+    const crlf = (s: string) => s.replace(/\n/g, '\r\n');
+    expect(ok(await minifyJs(inp('/w/a.js', crlf(js)))).outputs[0].content).toBe(ok(await minifyJs(inp('/w/a.js', js))).outputs[0].content);
+    expect(ok(await minifyCss(inp('/w/a.css', crlf(css)))).outputs[0].content).toBe('.a{color:red}');
+    const html = '<p>\n  a\n</p>\n';
+    expect(ok(await minifyHtml(inp('/w/a.html', crlf(html)))).outputs[0].content).toBe(ok(await minifyHtml(inp('/w/a.html', html))).outputs[0].content);
+  });
+});
+
+describe('minifyHtml non-JS scripts', () => {
+  it('keeps template and JSON scripts exactly as written', async () => {
+    const tpl = '<script type="text/template"><div>  {{ name }}  </div></script>';
+    const hbs = "<script type='text/x-handlebars-template'> <b>  x  </b> </script>";
+    const ld = '<script type="application/ld+json">{ "@context": "https://schema.org",  "name": "A" }</script>';
+    const out = ok(await minifyHtml(inp('/w/a.html', `<div>\n  ${tpl}\n  ${hbs}\n  ${ld}\n</div>`))).outputs[0].content;
+    expect(out).toContain(tpl);
+    expect(out).toContain(hbs);
+    expect(out).toContain(ld);
+  });
+
+  it('still minifies JavaScript scripts, including modules', async () => {
+    const out = ok(
+      await minifyHtml(inp('/w/a.html', '<script>var  a = 1;</script><script type="text/javascript">var  b = 2;</script><script type="module">let  c = 3; window.c = c;</script>')),
+    ).outputs[0].content;
+    expect(out).toContain('var a=1');
+    expect(out).toContain('var b=2');
+    expect(out).not.toContain('let  c');
+  });
+});

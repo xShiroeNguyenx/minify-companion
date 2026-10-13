@@ -1,15 +1,17 @@
+import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { normalizeConfig } from '../core/config';
 import { shouldMinify, matchesAny, type SkipReason } from '../core/filter';
 import { errorMessage } from '../core/issues';
 import { isMinFile, isSassPartial, langFromPath } from '../core/lang';
-import { resolveOutputPath, toPosix } from '../core/paths';
+import { looksLikeOutput, resolveOutputPath, toPosix } from '../core/paths';
 import { KeyedQueue } from '../core/queue';
 import { ScssGraph } from '../core/scssGraph';
 import { byteLength, formatBytes, formatSaving, stripBom } from '../core/stats';
-import type { Issue, MinifyConfig, Trigger } from '../core/types';
-import { runMinifier } from '../minifiers';
+import type { Issue, MinifyConfig, MinifyResult, Trigger } from '../core/types';
+import { WorkerPool } from '../core/workerPool';
+import type { WorkerRequest } from '../worker';
 import { Diagnostics } from './diagnostics';
 import { StatusBar } from './statusBar';
 import { exists, writeIfChanged } from './writer';
@@ -25,17 +27,25 @@ export type RunOutcome =
 
 const decoder = new TextDecoder('utf-8');
 
+/** Minify jobs in parallel, at most; also the folder commands' concurrency. */
+export const MAX_PARALLEL = Math.max(1, Math.min(4, (os.availableParallelism?.() ?? os.cpus().length) - 1));
+
 export class Engine implements vscode.Disposable {
   private readonly graph = new ScssGraph();
   private readonly queue: KeyedQueue;
   private readonly configWarningsShown = new Set<string>();
+  private readonly pool: WorkerPool<WorkerRequest, MinifyResult>;
+  /** A failed save pops up once per session; after that the status bar and Problems carry it. */
+  private savePopupShown = false;
 
   constructor(
     private readonly log: vscode.LogOutputChannel,
     private readonly status: StatusBar,
     private readonly diagnostics: Diagnostics,
+    workerScript: string,
   ) {
     this.queue = new KeyedQueue((key, error) => this.log.error(`${key}: ${errorMessage(error)}`));
+    this.pool = new WorkerPool(workerScript, { size: MAX_PARALLEL, timeoutMs: 60_000, idleMs: 120_000 });
   }
 
   readConfig(uri: vscode.Uri): MinifyConfig {
@@ -69,12 +79,16 @@ export class Engine implements vscode.Disposable {
     }
     if (!langFromPath(src)) return { kind: 'skipped', reason: 'unsupported' };
     if (isMinFile(src)) return { kind: 'skipped', reason: 'minFile' };
+    // Before resolving: for one of our own outputs the target may be the file itself, which
+    // would otherwise surface as an outputPattern error instead of a quiet skip.
+    if (looksLikeOutput(src, config.outputPattern, wsPath)) return { kind: 'skipped', reason: 'generatedOutput' };
 
     const target = resolveOutputPath(src, config.outputPattern, wsPath);
     if (!target.ok) {
       const message = vscode.l10n.t('Invalid minifyCompanion.outputPattern: {0}', target.reason);
       this.log.error(`${src}: ${message}`);
       this.status.failure(src, message);
+      this.popupOnFirstSaveFailure(trigger, src, message);
       return { kind: 'failed', message };
     }
     const outUri = vscode.Uri.file(target.path);
@@ -85,13 +99,14 @@ export class Engine implements vscode.Disposable {
       try {
         sizeBytes = (await vscode.workspace.fs.stat(uri)).size;
       } catch (error) {
-        return this.fail(src, uri, [{ message: errorMessage(error) }]);
+        return this.fail(src, uri, trigger, [{ message: errorMessage(error) }]);
       }
     }
 
     const decision = shouldMinify({
       srcPath: src,
       relativePath: wsPath ? path.posix.relative(wsPath, src) : undefined,
+      workspaceFolder: wsPath,
       trigger,
       config,
       workspaceTrusted: vscode.workspace.isTrusted,
@@ -112,17 +127,23 @@ export class Engine implements vscode.Disposable {
       try {
         code = decoder.decode(await vscode.workspace.fs.readFile(uri));
       } catch (error) {
-        return this.fail(src, uri, [{ message: errorMessage(error) }]);
+        return this.fail(src, uri, trigger, [{ message: errorMessage(error) }]);
       }
     }
     code = stripBom(code);
 
     const started = Date.now();
-    const result = await runMinifier(
-      { code, srcPath: src, outPath: target.path, config },
-      { loadPaths: this.sassLoadPaths(config, src, wsPath) },
-    );
-    if (!result.ok) return this.fail(src, uri, result.errors);
+    let result: MinifyResult;
+    try {
+      result = await this.pool.run({
+        input: { code, srcPath: src, outPath: target.path, config },
+        scss: { loadPaths: this.sassLoadPaths(config, src, wsPath) },
+      });
+    } catch (error) {
+      // The worker crashed or timed out; the job itself never got to report.
+      return this.fail(src, uri, trigger, [{ message: errorMessage(error) }], false);
+    }
+    if (!result.ok) return this.fail(src, uri, trigger, result.errors);
 
     let written = false;
     try {
@@ -130,7 +151,7 @@ export class Engine implements vscode.Disposable {
         if ((await writeIfChanged(vscode.Uri.file(out.path), out.content)) === 'written') written = true;
       }
     } catch (error) {
-      return this.fail(src, uri, [{ message: errorMessage(error) }], false);
+      return this.fail(src, uri, trigger, [{ message: errorMessage(error) }], false);
     }
     const ms = Date.now() - started;
 
@@ -152,7 +173,7 @@ export class Engine implements vscode.Disposable {
     return { kind: 'ok', outPath: target.path, before, after, written, ms };
   }
 
-  private fail(src: string, uri: vscode.Uri, errors: Issue[], toProblems = true): RunOutcome {
+  private fail(src: string, uri: vscode.Uri, trigger: Trigger, errors: Issue[], toProblems = true): RunOutcome {
     const first = errors[0]?.message ?? 'Unknown error';
     if (toProblems) this.diagnostics.report(src, uri, errors, vscode.DiagnosticSeverity.Error);
     for (const e of errors) {
@@ -161,7 +182,24 @@ export class Engine implements vscode.Disposable {
     }
     this.log.error(`${src}: the existing output was left untouched.`);
     this.status.failure(src, first);
+    this.popupOnFirstSaveFailure(trigger, src, first);
     return { kind: 'failed', message: first };
+  }
+
+  /**
+   * A failed save is easy to miss in the status bar, so the first one in a session pops up. Later
+   * ones do not: a file saved every few seconds while being fixed would otherwise nag. Commands
+   * report their own failures.
+   */
+  private popupOnFirstSaveFailure(trigger: Trigger, src: string, message: string): void {
+    if (trigger !== 'save' || this.savePopupShown) return;
+    this.savePopupShown = true;
+    const show = vscode.l10n.t('Show Output');
+    void vscode.window
+      .showErrorMessage(vscode.l10n.t('Minify failed for {0}: {1} The previous output was kept.', path.posix.basename(src), message), show)
+      .then((answer) => {
+        if (answer === show) this.log.show(true);
+      });
   }
 
   /** The file's own folder is implicit (compileString's url); these come after it. */
@@ -200,6 +238,6 @@ export class Engine implements vscode.Disposable {
   }
 
   dispose(): void {
-    // Nothing held beyond the injected disposables.
+    this.pool.dispose();
   }
 }

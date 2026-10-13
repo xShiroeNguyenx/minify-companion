@@ -3,7 +3,8 @@
 Extension VS Code tự động minify file **CSS / JS / HTML**: lưu `style.css` thì `style.min.css`
 được cập nhật ngay, không cần chạy build tool hay gõ lệnh.
 
-> Trạng thái: **v0.1.0 đã code xong, chưa commit / chưa phát hành** (2026-10-13). M0–M3 gộp vào v0.1.0; còn lại xem mục 10 (ô `[~]` / `[ ]`).
+> Trạng thái: **v0.2.0 đã code xong, chưa phát hành** (đã phát hành tới v0.1.1). Kết quả rà soát và
+> những gì còn lại: xem **mục 14**.
 >
 > **Quyết định đã chốt (2026-10-13):**
 > 1. Mặc định `onSave = ifMinExists`.
@@ -355,7 +356,7 @@ Không dùng `onStartupFinished` / `*` (không làm chậm khởi động VS Cod
 ### M3: Hoàn thiện (≈ 1.5 ngày) → **v0.3.0**
 - [x] Menu Explorer / editor title, `Minify Selected Files`, `Minify All in Workspace` (progress, cancel, xác nhận).
 - [x] `outputPattern` đầy đủ biến + rebase URL CSS khi đổi thư mục.
-- [~] Lazy-load minifier: **xong** (dynamic import). Worker thread cho file lớn: **chưa làm** (v0.1.0 dùng API async; file vài MB có thể làm Extension Host khựng một chút).
+- [x] Lazy-load minifier (v0.1.0) + worker thread pool cho mọi lần minify (v0.2.0).
 - [x] i18n en + vi.
 
 ### M4: Cấu hình nhóm và phát hành (≈ 1 ngày) → **v1.0.0**
@@ -398,3 +399,53 @@ Không dùng `onStartupFinished` / `*` (không làm chậm khởi động VS Cod
 ## 13. Quyết định
 Đã chốt ngày 2026-10-13, xem đầu file. Sau khi chốt, các mục **source map** và **SCSS** được kéo lên
 làm cùng M1–M2 (bản v0.1.0), thay vì M3 / v2 như dự kiến ban đầu.
+
+---
+
+## 14. Rà soát so với kế hoạch (2026-10-13, sau v0.1.1)
+
+Kiểm bằng cách đọc code và chạy thử thật, không dựa vào ô đã đánh dấu.
+
+### Đã kiểm chứng chạy đúng
+- File rỗng → `.min` rỗng; file chỉ có license → chỉ còn comment license; CRLF → minify bình thường.
+- `.js` có `import` sau comment, `export { x }` ở cuối file → nhận đúng là module.
+- HTML: `<script type="module">` được minify; JSON-LD giữ nguyên.
+- Lazy-load: 4 minifier bọc `__esm`, chỉ khởi tạo khi gặp loại file đó lần đầu.
+- Tốc độ (máy dev): CSS 80 KB = 149 ms (mục tiêu 50 KB < 150 ms: **đạt**).
+
+### Chưa làm / chưa đạt
+| # | Mục | Vị trí kế hoạch | Ghi chú |
+|---|---|---|---|
+| 1 | JS lớn chậm hơn mục tiêu | §7 | JS 356 KB = 1259 ms (≈ 0,7 s cho 200 KB; mục tiêu < 500 ms). Terser chạy CPU đồng bộ nên **Extension Host bị chặn** trong lúc đó |
+| 2 | Worker thread cho file lớn | §5.3, M3 | Chưa làm; là cách sửa #1 (không nhanh hơn nhưng không chặn editor) |
+| 3 | `.minifyrc.json` + JSON schema | §3, M4 | Chưa làm |
+| 4 | Popup khi lỗi lần đầu trong phiên | §2.4 | Hiện lỗi khi lưu chỉ hiện ở status bar + Problems + Output, không có popup |
+| 5 | Chống vòng lặp cho output không tên `*.min.*` | §5.5 | Với `outputPattern` kiểu `${workspaceFolder}/out/${name}.css`, file trong `out/` vẫn bị coi là nguồn (Minify All sẽ báo lỗi "đích trùng nguồn" thay vì bỏ qua) |
+| 6 | Đoán module: thử parse lại khi lỗi | §4.1 | Mới chỉ đoán bằng regex, chưa có bước thử lại |
+| 7 | `npm audit` trong CI + Dependabot | §12 | Chưa làm |
+| 8 | Ghi số đo hiệu năng vào CHANGELOG | §7 | Chưa làm |
+| 9 | Test cho file rỗng / chỉ license / CRLF | §6 #3, #4, #6 | Hành vi đúng (đã thử) nhưng chưa có test giữ lại |
+| 10 | `<script type="text/template">` | §6 #8 | Khoảng trắng bên trong bị gộp (`  {{ name }}  ` → ` {{ name }} `), chưa giữ nguyên tuyệt đối |
+| 11 | Integration test cho Minify All / chuột phải thư mục / Toggle | §8.2 | Chưa có |
+| 12 | GIF demo trong README | M4 | Cần quay màn hình |
+| 13 | Checklist kiểm thử tay | §8.3 | Chưa làm cái nào (Remote, multi-root, untrusted, giao diện tiếng Việt) — README đang ghi hỗ trợ Remote mà chưa thử |
+
+### Kết quả sau v0.2.0
+| # | Trạng thái | Cách làm / kiểm chứng |
+|---|---|---|
+| 1, 2 | **Xong** | Mọi lần minify chạy trong worker thread pool (`src/core/workerPool.ts`). Integration test: minify 361 KB JS (~2 s) mà extension host khựng < 300 ms. Tốc độ minify không đổi (đó là giới hạn của Terser), nhưng editor không còn bị chặn |
+| 3 | Chưa làm | `.minifyrc.json` để dành v1.0.0 như kế hoạch |
+| 4 | **Xong** | Popup ở lần lưu lỗi đầu tiên trong phiên, có nút Show Output |
+| 5 | **Xong** | `looksLikeOutput()` đảo `outputPattern` thành regex; integration test xác nhận Minify All không tạo `out/out` |
+| 6 | **Xong** | Đoán module sai thì thử lại chiều ngược (trừ khi user đặt `module`) |
+| 7 | **Xong** | `npm audit --omit=dev` trong CI + `.github/dependabot.yml` (chặn sass ≥ 1.100) |
+| 8 | **Xong** | Số đo ghi trong CHANGELOG 0.2.0 |
+| 9 | **Xong** | Test file rỗng / chỉ license / CRLF |
+| 10 | **Xong** | Script không phải JS được giữ nguyên từng ký tự |
+| 11 | **Xong** | Integration test cho Minify All, chuột phải thư mục, Toggle, output folder tuỳ chỉnh, file lớn không chặn |
+| 12 | Chưa làm | GIF demo: cần quay màn hình |
+| 13 | Chưa làm | Kiểm thử tay. README đã bỏ câu hứa hỗ trợ Remote cho tới khi thử thật |
+
+Phát hiện thêm khi làm: setting dạng object từ VS Code là Proxy, không gửi được sang worker
+("could not be cloned"). Unit test không bắt được vì dùng object thường; integration test bắt được.
+Đã sửa trong `normalizeConfig` và thêm unit test dùng Proxy.

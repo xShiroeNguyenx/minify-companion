@@ -6,7 +6,7 @@ Edit `style.css`, press <kbd>Ctrl</kbd>+<kbd>S</kbd>, and `style.min.css` is up 
 
 Minify Companion minifies **CSS, JavaScript and HTML** and compiles **SCSS / Sass** every time you save, writing the result next to the source. It runs entirely inside VS Code, offline, and never sends your code anywhere.
 
-**Current version:** v0.1.1
+**Current version:** v0.2.0
 
 ## Features
 
@@ -17,7 +17,8 @@ Minify Companion minifies **CSS, JavaScript and HTML** and compiles **SCSS / Sas
 - **License comments kept**: `/*! … */`, `@license`, and `<!--! … -->` in HTML.
 - **Safe defaults**: top-level names of classic scripts are not renamed (other `<script>` tags may use them), CSS `@import` stays as written, template tags (`<?php ?>`, `<% %>`, `{{ }}`) in HTML are left alone.
 - **Only writes when something changed**, so saving without a real change does not touch the `.min` file or show up in git.
-- Works in multi-root workspaces and over Remote SSH / WSL / Dev Containers.
+- Settings can differ per folder in multi-root workspaces.
+- Minifying runs in background worker threads, so even a large file never freezes the editor.
 
 ## How it decides what to minify
 

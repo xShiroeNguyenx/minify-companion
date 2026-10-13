@@ -34,11 +34,22 @@ function toRegexList(value: unknown): RegExp[] | undefined {
   return out;
 }
 
+/**
+ * A whole `<script>` whose type is not JavaScript (`text/template`, `text/x-handlebars-template`,
+ * `application/ld+json`…). html-minifier leaves such a script alone by itself, but once
+ * `ignoreCustomFragments` protects a `{{ … }}` inside it, the whitespace around that fragment gets
+ * collapsed. Protecting the entire block keeps the template exactly as written.
+ */
+export const NON_JS_SCRIPT =
+  /<script\b[^>]*?\btype\s*=\s*["']?(?!(?:text\/javascript|application\/javascript|text\/ecmascript|application\/ecmascript|module)["'\s>])[^"'\s>]+["']?[^>]*>[\s\S]*?<\/script\s*>/i;
+
 export function buildHtmlOptions(input: MinifyInput): Options {
   const user = { ...input.config.html } as Record<string, unknown>;
   const fragments = toRegexList(user.ignoreCustomFragments);
   if (fragments) user.ignoreCustomFragments = fragments;
   const options: Options = { ...DEFAULT_HTML_OPTIONS, ...(user as Options) };
+  // First, so a template block wins over the {{ }} fragments inside it.
+  options.ignoreCustomFragments = [NON_JS_SCRIPT, ...(options.ignoreCustomFragments ?? [])];
   if (input.config.preserveLicenseComments) {
     // `<!--! … -->` survives removeComments, like `/*! … */` in CSS and JS.
     options.ignoreCustomComments = [/^!/, ...(options.ignoreCustomComments ?? [])];

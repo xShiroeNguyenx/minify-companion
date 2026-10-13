@@ -99,6 +99,62 @@ export function resolveOutputPath(srcPath: string, pattern: string, workspaceFol
   return { ok: true, path: out };
 }
 
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Whether `file` has the shape of something `outputPattern` writes — i.e. could be one of our own
+ * outputs. With the default pattern that is any `*.min.*`; with `${workspaceFolder}/out/...` it is
+ * anything under `out/`. Such a file must never be minified again: it would produce
+ * `out/out/a.css`, then `out/out/out/a.css` on the next "Minify All", and so on.
+ *
+ * The pattern is turned into a regex: `${dir}`/`${relativeDir}` match any folders, `${name}` and
+ * `${ext}` one path segment, `${workspaceFolder}` the literal folder.
+ */
+export function looksLikeOutput(file: string, pattern: string, workspaceFolder?: string): boolean {
+  const target = path.posix.normalize(file);
+  const usesWorkspace = /\$\{(workspaceFolder|relativeDir)\}/.test(pattern);
+  if (usesWorkspace && !workspaceFolder) return false;
+  const ws = workspaceFolder ? path.posix.normalize(workspaceFolder).replace(/\/+$/, '') : '';
+
+  let re = '';
+  let rest = pattern.trim();
+  // Same rule as resolveOutputPath: no leading variable or root means "relative to the source".
+  if (!/^\$\{/.test(rest) && !path.posix.isAbsolute(rest) && !isWindowsPath(rest)) re += '(?:.*/)?';
+  while (rest) {
+    const m = /^\$\{([^}]*)\}\/?/.exec(rest);
+    if (m) {
+      const slash = m[0].endsWith('/');
+      switch (m[1]) {
+        case 'dir':
+          re += slash ? '(?:.*/)?' : '.*';
+          break;
+        case 'relativeDir':
+          // "." when the source is at the workspace root, which normalizes away.
+          re += slash ? '(?:.*/)?' : '.*';
+          break;
+        case 'workspaceFolder':
+          re += escapeRegExp(ws) + (slash ? '/' : '');
+          break;
+        case 'name':
+          re += '[^/]+' + (slash ? '/' : '');
+          break;
+        case 'ext':
+          re += '[^/.]+' + (slash ? '/' : '');
+          break;
+        default:
+          return false;
+      }
+      rest = rest.slice(m[0].length);
+    } else {
+      const next = rest.indexOf('${');
+      const literal = next < 0 ? rest : rest.slice(0, next);
+      re += escapeRegExp(path.posix.normalize(literal) === '.' ? '' : literal);
+      rest = next < 0 ? '' : rest.slice(next);
+    }
+  }
+  return new RegExp(`^${re}$`, isWindowsPath(target) ? 'i' : '').test(target);
+}
+
 /** Sibling of the minified file holding the expanded CSS, for `scss.emitCss`. */
 export function expandedCssPath(outPath: string, srcPath: string): string {
   const base = path.posix.basename(srcPath);

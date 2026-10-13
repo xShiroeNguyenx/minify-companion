@@ -1,18 +1,19 @@
-// Bundles src/extension.ts and every runtime dependency into dist/extension.js,
-// so the .vsix ships no node_modules. `vscode` is provided by the host.
+// Bundles into dist/ so the .vsix ships no node_modules. `vscode` is provided by the host.
+// - extension.js: the extension itself, small; never loads a minifier.
+// - worker.js: terser, clean-css, html-minifier-terser and sass, run in worker threads.
 import * as esbuild from 'esbuild';
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
 const ctx = await esbuild.context({
-  entryPoints: ['src/extension.ts'],
+  entryPoints: ['src/extension.ts', 'src/worker.ts'],
   bundle: true,
   format: 'cjs',
   platform: 'node',
   // VS Code 1.85 runs on Electron 25 / Node 18.
   target: 'node18',
-  outfile: 'dist/extension.js',
+  outdir: 'dist',
   // sass only needs @parcel/watcher for `sass --watch`, which we never call.
   external: ['vscode', '@parcel/watcher'],
   minify: production,

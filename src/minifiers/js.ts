@@ -50,8 +50,22 @@ export async function minifyJs(input: MinifyInput): Promise<MinifyResult> {
   const options = buildTerserOptions(input, mapPath);
   // Keyed by the path the map should record, relative to where the map sits.
   const sourceName = mapPath ? relativeFromMap(mapPath, input.srcPath) : path.posix.basename(input.srcPath);
+  const files = { [sourceName]: stripSourceMapComment(input.code) };
   try {
-    const result = await minify({ [sourceName]: stripSourceMapComment(input.code) }, options);
+    let result;
+    try {
+      result = await minify(files, options);
+    } catch (error) {
+      // The module/script guess is a regex. When it was ours (not the user's `module` option) and
+      // parsing failed, try the other way once: a script mistaken for a module fails on strict-mode
+      // rules (`with`, octal literals). If that fails too, the first error is the one reported.
+      if ('module' in input.config.terser) throw error;
+      try {
+        result = await minify(files, { ...options, module: !options.module });
+      } catch {
+        throw error;
+      }
+    }
     const code = result.code ?? '';
     const outputs = [{ path: input.outPath, content: code }];
     if (mapPath && typeof result.map === 'string') {

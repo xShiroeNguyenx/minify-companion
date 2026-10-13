@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-dependencies:
+        dependency-type: development
+    ignore:
+      # sass 1.100+ requires Node 20.19; VS Code 1.85 (engines.vscode) runs extensions on Node 18.
+      - dependency-name: sass
+        versions: ['>=1.100.0']
+      # Must match engines.vscode, or vsce refuses to package.
+      - dependency-name: '@types/vscode'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      # The oldest Node the extension runs on is 18; types must not promise newer APIs.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -58,7 +58,10 @@ export function normalizeConfig(get: (key: string) => unknown): NormalizedConfig
     const value = get(key);
     if (value === undefined || value === null) return;
     if (valid(value)) {
-      config[field] = value as MinifyConfig[K];
+      // VS Code hands out objects and arrays from settings as read-only proxies, which cannot be
+      // posted to a worker thread ("could not be cloned"). Settings are JSON, so a JSON round
+      // trip gives plain data.
+      config[field] = (typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value) as MinifyConfig[K];
     } else {
       warnings.push(`minifyCompanion.${key} has an invalid value (${JSON.stringify(value)}); using the default.`);
     }

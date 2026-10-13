@@ -1,11 +1,13 @@
 import * as path from 'path';
 import picomatch from 'picomatch';
 import { isMinFile, isSassPartial, langFromPath } from './lang';
+import { looksLikeOutput } from './paths';
 import type { MinifyConfig, Trigger } from './types';
 
 export type SkipReason =
   | 'unsupported'
   | 'minFile'
+  | 'generatedOutput'
   | 'partial'
   | 'languageDisabled'
   | 'excluded'
@@ -21,6 +23,8 @@ export interface FilterInput {
   srcPath: string;
   /** Path relative to its workspace folder, or undefined for a loose file. */
   relativePath?: string;
+  /** Absolute POSIX-style workspace folder, for outputPattern variables. */
+  workspaceFolder?: string;
   trigger: Trigger;
   config: MinifyConfig;
   workspaceTrusted: boolean;
@@ -48,6 +52,9 @@ export function shouldMinify(input: FilterInput): FilterResult {
   const lang = langFromPath(srcPath);
   if (!lang) return { ok: false, reason: 'unsupported' };
   if (isMinFile(srcPath)) return { ok: false, reason: 'minFile' };
+  // One of our own outputs under a custom outputPattern (out/a.css): minifying it again would
+  // write out/out/a.css, and so on with every Minify All.
+  if (looksLikeOutput(srcPath, config.outputPattern, input.workspaceFolder)) return { ok: false, reason: 'generatedOutput' };
   if (isSassPartial(srcPath)) return { ok: false, reason: 'partial' };
 
   if (trigger !== 'explicit') {

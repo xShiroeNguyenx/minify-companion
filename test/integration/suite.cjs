@@ -100,6 +100,73 @@ const cases = {
       await cfg.update('sourceMap', undefined, vscode.ConfigurationTarget.Workspace);
     }
   },
+
+  async 'minifying a large JS file does not block the extension host'() {
+    // ~360 KB: about 1.2 s of Terser work, which used to freeze the host for that long.
+    const big = Array.from({ length: 2600 }, (_, i) => `function fn${i}(alpha, beta) { var total = alpha + beta * ${i}; if (total > 10) { return total - 1; } return total; }\nwindow.fn${i} = fn${i};\n`).join('');
+    fs.writeFileSync(file('js/big.js'), '');
+    fs.writeFileSync(file('js/big.min.js'), '');
+    let worstLag = 0;
+    let last = Date.now();
+    const timer = setInterval(() => {
+      const now = Date.now();
+      worstLag = Math.max(worstLag, now - last - 20);
+      last = now;
+    }, 20);
+    try {
+      await editAndSave('js/big.js', big);
+      await waitFor('big.min.js written', () => read('js/big.min.js').includes('window.fn2599='), 30000);
+    } finally {
+      clearInterval(timer);
+    }
+    assert.ok(worstLag < 300, `extension host stalled for ${worstLag} ms`);
+  },
+
+  async 'Toggle Minify on Save turns saving off and back on'() {
+    const cfg = () => vscode.workspace.getConfiguration('minifyCompanion');
+    await vscode.commands.executeCommand('minifyCompanion.toggleAuto');
+    assert.strictEqual(cfg().get('onSave'), 'off');
+    await editAndSave('css/style.css', '.a { width: 7px; }\n');
+    await sleep(800);
+    assert.notStrictEqual(read('css/style.min.css'), '.a{width:7px}', 'saving while off must not minify');
+
+    await vscode.commands.executeCommand('minifyCompanion.toggleAuto');
+    assert.strictEqual(cfg().get('onSave'), 'ifMinExists');
+    await editAndSave('css/style.css', '.a { width: 8px; }\n');
+    await waitFor('minify on save is back', () => read('css/style.min.css') === '.a{width:8px}');
+  },
+
+  async 'Minify on a folder (Explorer) creates outputs for every file inside'() {
+    const folder = vscode.Uri.file(file('lib'));
+    await vscode.commands.executeCommand('minifyCompanion.minifySelected', folder, [folder]);
+    assert.ok(read('lib/util.min.js').includes('window.twice='), 'lib/util.min.js');
+    assert.strictEqual(read('lib/deep/box.min.css'), '.box{padding:0}');
+    assert.ok(!fs.existsSync(file('vendor/v.min.js')), 'vendor/ is outside the selection');
+  },
+
+  async 'output files under a custom outputPattern are never minified again'() {
+    const cfg = vscode.workspace.getConfiguration('minifyCompanion');
+    await cfg.update('outputPattern', '${workspaceFolder}/out/${relativeDir}/${name}.${ext}', vscode.ConfigurationTarget.Workspace);
+    try {
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file('extra/e.css')));
+      await vscode.commands.executeCommand('minifyCompanion.minifyCurrent');
+      await waitFor('out/extra/e.css written', () => read('out/extra/e.css') === '.e{margin:0}');
+      await vscode.commands.executeCommand('minifyCompanion.minifyWorkspace');
+      assert.ok(!fs.existsSync(file('out/out')), 'Minify All must not minify its own outputs into out/out');
+    } finally {
+      await cfg.update('outputPattern', undefined, vscode.ConfigurationTarget.Workspace);
+      fs.rmSync(file('out'), { recursive: true, force: true });
+    }
+  },
+
+  async 'Minify All in Workspace creates missing outputs and honours exclude'() {
+    await vscode.commands.executeCommand('minifyCompanion.minifyWorkspace');
+    assert.strictEqual(read('extra/e.min.css'), '.e{margin:0}');
+    assert.ok(fs.existsSync(file('css/other.min.css')), 'css/other.min.css');
+    assert.ok(!fs.existsSync(file('vendor/v.min.js')), 'vendor/** is excluded by default');
+    assert.ok(!fs.existsSync(file('scss/_vars.min.css')), 'partials never get an output');
+    assert.ok(!fs.existsSync(file('css/style.min.min.css')), '.min files are never sources');
+  },
 };
 
 exports.run = async function run() {

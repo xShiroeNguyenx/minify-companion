@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { registerCommands } from './commands';
 import { langFromPath } from './core/lang';
@@ -9,7 +10,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const log = vscode.window.createOutputChannel('Minify Companion', { log: true });
   const status = new StatusBar();
   const diagnostics = new Diagnostics();
-  const engine = new Engine(log, status, diagnostics);
+  const engine = new Engine(log, status, diagnostics, path.join(context.extensionPath, 'dist', 'worker.js'));
   context.subscriptions.push(log, status, diagnostics, engine);
 
   const applyStatusSetting = () => status.setEnabled(vscode.workspace.getConfiguration('minifyCompanion').get<boolean>('statusBar', true));

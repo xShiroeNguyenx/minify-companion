@@ -1,4 +1,3 @@
-import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { SkipReason } from '../core/filter';
@@ -6,7 +5,7 @@ import { isMinFile, isSassPartial, SUPPORTED_GLOB } from '../core/lang';
 import { runPool } from '../core/queue';
 import { formatBytes, formatSaving } from '../core/stats';
 import type { Trigger } from '../core/types';
-import type { Engine, RunOutcome } from '../runtime/engine';
+import { MAX_PARALLEL, type Engine, type RunOutcome } from '../runtime/engine';
 
 /** Asking before a batch this large: it may create a lot of files. */
 const CONFIRM_ABOVE = 50;
@@ -17,6 +16,8 @@ function skipText(reason: SkipReason): string {
       return vscode.l10n.t('This file type is not supported. Minify works on .css, .js, .mjs, .cjs, .html, .htm, .scss and .sass.');
     case 'minFile':
       return vscode.l10n.t('This is already a .min file.');
+    case 'generatedOutput':
+      return vscode.l10n.t('This file is where minifyCompanion.outputPattern writes its output, so it is not minified again.');
     case 'partial':
       return vscode.l10n.t('Sass partials (files starting with _) have no output of their own; they are compiled through the files that @use them.');
     case 'tooLarge':
@@ -158,7 +159,6 @@ async function runBatch(engine: Engine, log: vscode.LogOutputChannel, jobs: Arra
     return;
   }
   const counts = { written: 0, unchanged: 0, skipped: 0, failed: 0 };
-  const limit = Math.max(1, Math.min(4, (os.availableParallelism?.() ?? os.cpus().length) - 1));
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Minifying'), cancellable: true },
@@ -166,7 +166,7 @@ async function runBatch(engine: Engine, log: vscode.LogOutputChannel, jobs: Arra
       let done = 0;
       await runPool(
         jobs,
-        limit,
+        MAX_PARALLEL,
         async ({ uri, trigger }) => {
           const outcome = await engine.run(uri, trigger, openText(uri));
           if (outcome.kind === 'ok') counts[outcome.written ? 'written' : 'unchanged']++;

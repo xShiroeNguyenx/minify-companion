@@ -27,6 +27,11 @@ const files = {
   'scss/main.min.css': '',
   'page.html': '<p>  Hello  <b>World</b>  </p>\n',
   'page.min.html': '',
+  // For the folder / workspace commands: no .min yet, one excluded folder.
+  'lib/util.js': 'function twice(value) {\n  return value * 2;\n}\nwindow.twice = twice;\n',
+  'lib/deep/box.css': '.box {\n  padding: 0px;\n}\n',
+  'extra/e.css': '.e {\n  margin: 0px;\n}\n',
+  'vendor/v.js': 'var  vendored = 1;\n',
   '.vscode/settings.json': JSON.stringify({ 'files.autoSave': 'off' }),
 };
 for (const [rel, content] of Object.entries(files)) {

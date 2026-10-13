@@ -1,6 +1,8 @@
 {
   "This file type is not supported. Minify works on .css, .js, .mjs, .cjs, .html, .htm, .scss and .sass.": "Không hỗ trợ loại file này. Minify làm việc với .css, .js, .mjs, .cjs, .html, .htm, .scss và .sass.",
   "This is already a .min file.": "Đây đã là file .min.",
+  "This file is where minifyCompanion.outputPattern writes its output, so it is not minified again.": "File này nằm đúng chỗ minifyCompanion.outputPattern ghi kết quả, nên không minify lại nữa.",
+  "Minify failed for {0}: {1} The previous output was kept.": "Minify {0} thất bại: {1} File đích cũ được giữ nguyên.",
   "Sass partials (files starting with _) have no output of their own; they are compiled through the files that @use them.": "Sass partial (file bắt đầu bằng _) không có file đích riêng; chúng được biên dịch qua các file @use chúng.",
   "The file is larger than minifyCompanion.maxFileSizeKB.": "File lớn hơn minifyCompanion.maxFileSizeKB.",
   "Skipped ({0}).": "Bỏ qua ({0}).",

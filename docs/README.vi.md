@@ -6,7 +6,7 @@ Sửa `style.css`, bấm <kbd>Ctrl</kbd>+<kbd>S</kbd>, `style.min.css` đã đư
 
 Minify Companion minify **CSS, JavaScript, HTML** và biên dịch **SCSS / Sass** mỗi lần bạn lưu, ghi kết quả ngay cạnh file nguồn. Mọi thứ chạy trong VS Code, offline, không gửi code đi đâu.
 
-**Phiên bản hiện tại:** v0.1.1
+**Phiên bản hiện tại:** v0.2.0
 
 ## Tính năng
 
@@ -17,7 +17,8 @@ Minify Companion minify **CSS, JavaScript, HTML** và biên dịch **SCSS / Sass
 - **Giữ comment license**: `/*! … */`, `@license`, và `<!--! … -->` trong HTML.
 - **Mặc định an toàn**: không đổi tên biến top-level của script thường (`<script>` khác có thể đang dùng), giữ nguyên `@import` trong CSS, không đụng vào thẻ template (`<?php ?>`, `<% %>`, `{{ }}`) trong HTML.
 - **Chỉ ghi khi có thay đổi**: lưu mà nội dung không đổi thì file `.min` không bị chạm tới, không hiện trong git.
-- Chạy được với multi-root workspace và Remote SSH / WSL / Dev Container.
+- Setting có thể khác nhau theo từng thư mục trong multi-root workspace.
+- Minify chạy trong worker thread nền, nên file lớn cũng không làm editor bị đứng.
 
 ## Cách nó quyết định minify file nào
 

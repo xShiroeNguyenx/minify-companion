@@ -32,6 +32,20 @@ describe('normalizeConfig', () => {
     expect(warnings[0]).toContain('minifyCompanion.onSave');
   });
 
+  it('returns plain data that can be posted to a worker, even when settings are proxies', () => {
+    // What vscode.workspace.getConfiguration().get() returns for objects and arrays.
+    const proxy = <T extends object>(o: T) => new Proxy(Object.freeze(o), {});
+    const values: Record<string, unknown> = {
+      'js.terser': proxy({ compress: proxy({ passes: 2 }) }),
+      exclude: proxy(['**/x/**']),
+    };
+    expect(() => structuredClone(values['js.terser'])).toThrow();
+    const { config } = normalizeConfig((k) => values[k]);
+    expect(() => structuredClone(config)).not.toThrow();
+    expect(config.terser).toEqual({ compress: { passes: 2 } });
+    expect(config.exclude).toEqual(['**/x/**']);
+  });
+
   it('does not share array instances with the defaults', () => {
     const { config } = normalizeConfig(() => undefined);
     expect(config).not.toBe(DEFAULT_CONFIG);

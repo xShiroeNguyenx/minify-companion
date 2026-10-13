@@ -103,3 +103,21 @@ describe('matchesAny', () => {
     expect(matchesAny([], 'a.css')).toBe(false);
   });
 });
+
+describe('shouldMinify with a custom outputPattern', () => {
+  const config = { ...DEFAULT_CONFIG, outputPattern: '${workspaceFolder}/out/${relativeDir}/${name}.${ext}' };
+
+  it('never treats a file in the output folder as a source, for any trigger', () => {
+    for (const trigger of ['save', 'explicit', 'scan'] as const) {
+      expect(
+        shouldMinify({ srcPath: '/w/out/css/a.css', relativePath: 'out/css/a.css', workspaceFolder: '/w', trigger, config, workspaceTrusted: true, outputExists: true }),
+      ).toEqual({ ok: false, reason: 'generatedOutput' });
+    }
+  });
+
+  it('still minifies real sources', () => {
+    expect(
+      shouldMinify({ srcPath: '/w/css/a.css', relativePath: 'css/a.css', workspaceFolder: '/w', trigger: 'scan', config, workspaceTrusted: true, outputExists: false }),
+    ).toEqual({ ok: true });
+  });
+});

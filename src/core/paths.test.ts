@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expandedCssPath, isInside, relativeFromMap, resolveOutputPath, samePath, toPosix } from './paths';
+import { expandedCssPath, isInside, looksLikeOutput, relativeFromMap, resolveOutputPath, samePath, toPosix } from './paths';
 
 const P = '${dir}/${name}.min.${ext}';
 
@@ -57,6 +57,44 @@ describe('resolveOutputPath', () => {
   it('refuses unknown variables and empty patterns', () => {
     expect(resolveOutputPath('/w/a.css', '${dir}/${base}.min.css', '/w')).toMatchObject({ ok: false });
     expect(resolveOutputPath('/w/a.css', '  ', '/w').ok).toBe(false);
+  });
+});
+
+describe('looksLikeOutput', () => {
+  it('matches .min files with the default pattern, and nothing else', () => {
+    expect(looksLikeOutput('/w/css/a.min.css', P, '/w')).toBe(true);
+    expect(looksLikeOutput('/w/a.min.js', P)).toBe(true);
+    expect(looksLikeOutput('/w/css/a.css', P, '/w')).toBe(false);
+    expect(looksLikeOutput('/w/admin.js', P, '/w')).toBe(false);
+  });
+
+  it('matches everything under an output folder', () => {
+    const out = '${workspaceFolder}/out/${relativeDir}/${name}.${ext}';
+    expect(looksLikeOutput('/w/out/css/a.css', out, '/w')).toBe(true);
+    expect(looksLikeOutput('/w/out/a.css', out, '/w')).toBe(true);
+    expect(looksLikeOutput('/w/css/a.css', out, '/w')).toBe(false);
+    expect(looksLikeOutput('/w/outside/a.css', out, '/w')).toBe(false);
+  });
+
+  it('agrees with resolveOutputPath on what it produces', () => {
+    const patterns = [P, '${workspaceFolder}/out/${relativeDir}/${name}.${ext}', 'min/${name}.${ext}', '${dir}/build/${name}.min.${ext}'];
+    for (const pattern of patterns) {
+      for (const src of ['/w/a.css', '/w/css/deep/b.js', '/w/s/main.scss']) {
+        const r = resolveOutputPath(src, pattern, '/w');
+        if (!r.ok) throw new Error(r.reason);
+        expect(looksLikeOutput(r.path, pattern, '/w'), `${pattern} → ${r.path}`).toBe(true);
+        expect(looksLikeOutput(src, pattern, '/w'), `${pattern} ← ${src}`).toBe(false);
+      }
+    }
+  });
+
+  it('folds case for Windows paths', () => {
+    expect(looksLikeOutput('D:/W/OUT/a.css', '${workspaceFolder}/out/${name}.${ext}', 'd:/w')).toBe(true);
+  });
+
+  it('is false for unknown variables or a missing workspace', () => {
+    expect(looksLikeOutput('/w/a.css', '${base}.css', '/w')).toBe(false);
+    expect(looksLikeOutput('/w/out/a.css', '${workspaceFolder}/out/${name}.${ext}')).toBe(false);
   });
 });
 

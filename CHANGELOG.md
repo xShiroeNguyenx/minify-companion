@@ -3,6 +3,32 @@
 Tài liệu này theo format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 extension áp dụng [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-13
+
+### Changed — ⚡ Minifying no longer freezes the editor
+
+- **Minifying now runs in worker threads, so a large file never blocks VS Code.** Terser is synchronous CPU work: about 1.3 s for 360 KB of JavaScript, during which the extension host — and with it every other extension, and the save itself — used to stand still. The work now happens in a small pool of reusable workers (at most one per spare CPU core, up to 4), started on demand and stopped after two idle minutes ([src/core/workerPool.ts](src/core/workerPool.ts), [src/worker.ts](src/worker.ts)).
+  - **Verified in VS Code 1.85**: while a 361 KB file is minified (about 2 s), the extension host never stalls more than 300 ms.
+  - **A worker that crashes, or a job that runs past 60 s, fails with a message saying so** and the next save gets a fresh worker; the existing `.min` file is left untouched.
+  - **Activation is lighter**: `extension.js` went from 4 MB to 45 KB, because the minifier libraries now live only in `worker.js`.
+- **Measured on a development machine** (minify time only): CSS 80 KB → 149 ms; JavaScript 356 KB → 1.26 s. In VS Code, the first run after start-up adds about a second while the worker loads.
+
+### Added
+
+- **The first failed save of a session pops up**, with a **Show Output** button. Later failures stay in the status bar and the Problems panel, so a file saved repeatedly while you fix it does not nag ([src/runtime/engine.ts](src/runtime/engine.ts)).
+
+### Fixed
+
+- **With a custom `outputPattern`, the outputs are no longer minified again.** With `"${workspaceFolder}/out/${relativeDir}/${name}.${ext}"`, *Minify All in Workspace* used to treat `out/css/a.css` as a source and write `out/out/css/a.css`, one level deeper on every run. A file that has the shape of an output under the current pattern is now always skipped ([src/core/paths.ts](src/core/paths.ts)).
+- **Settings that hold objects (`js.terser`, `css.cleancss`, `html.options`) are copied to plain data** before use; VS Code hands them out as read-only proxies ([src/core/config.ts](src/core/config.ts)).
+- **A script mistaken for an ES module is retried as a script.** The module guess is a pattern match. When it misfired (for example, `export default` at the start of a line inside a template string), strict-mode rules rejected valid legacy code such as `with` statements. An explicit `module` in `minifyCompanion.js.terser` is still honoured as given ([src/minifiers/js.ts](src/minifiers/js.ts)).
+- **`<script type="text/template">` and other non-JavaScript scripts are kept exactly as written.** Whitespace around `{{ … }}` inside them used to be collapsed ([src/minifiers/html.ts](src/minifiers/html.ts)).
+
+### Internal
+
+- **CI**: `npm audit` of the runtime dependencies on every build; Dependabot for npm and GitHub Actions, told never to propose sass 1.100+ (it requires Node 20.19).
+- **New tests**: empty files, license-only files, CRLF line endings, module-guess fallback, template scripts, the worker pool (crash, timeout, idle shutdown), and integration tests for *Minify All*, the folder context menu, *Toggle Minify on Save*, custom output folders, and the non-blocking large file.
+
 ## [0.1.1] - 2026-10-13
 
 ### Fixed — Sass in folders opened through a short (8.3) Windows path

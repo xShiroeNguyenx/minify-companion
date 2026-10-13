@@ -1,7 +1,7 @@
 # Third-party software
 
-Minify Companion bundles the following packages into `dist/extension.js`. Their license texts
-are also collected by the bundler into `dist/extension.js.LEGAL.txt`, shipped in the extension.
+Minify Companion bundles the following packages into `dist/worker.js`. Their license texts
+are also collected by the bundler into `dist/worker.js.LEGAL.txt`, shipped in the extension.
 
 | Package | Version | License | Source |
 |---|---|---|---|
@@ -9,7 +9,7 @@ are also collected by the bundler into `dist/extension.js.LEGAL.txt`, shipped in
 | clean-css | 5.x | MIT | https://github.com/clean-css/clean-css |
 | html-minifier-terser | 7.x | MIT | https://github.com/terser/html-minifier-terser |
 | sass (Dart Sass) | 1.99.x | MIT | https://github.com/sass/dart-sass |
-| picomatch | 4.x | MIT | https://github.com/micromatch/picomatch |
+| picomatch (in `dist/extension.js`) | 4.x | MIT | https://github.com/micromatch/picomatch |
 
 And their runtime dependencies: `@jridgewell/*` (MIT), `acorn` (MIT), `source-map` (BSD-3-Clause),
 `source-map-js` (BSD-3-Clause), `source-map-support` (MIT), `buffer-from` (MIT), `commander` (MIT),
