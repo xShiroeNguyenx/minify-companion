@@ -3,6 +3,17 @@
 Tài liệu này theo format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 extension áp dụng [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-10-13
+
+### Fixed — Sass in folders opened through a short (8.3) Windows path
+
+- **Sass source maps, partial errors and partial recompiles now work when the project's path uses a Windows 8.3 short name** (`C:\Users\LONGNA~1\...`). Sass corrects the spelling of every file it loads to the long name on disk, while the editor keeps the spelling you opened. The two never matched, which caused three problems ([src/minifiers/scss.ts](src/minifiers/scss.ts)):
+  - **Map sources pointed at the wrong place.** They read like `../../../../longname/.../_vars.scss` instead of `_vars.scss`, so browser devtools could not find the source.
+  - **An error inside a partial was reported against a file the editor did not have open**, so the open partial showed nothing in the Problems panel.
+  - **Saving a partial did not find its entries in the dependency graph** and fell back to recompiling every Sass entry in the folder.
+- Every path Sass reports is now mapped back onto the spelling of the source's own folder.
+- **CI**: GitHub Actions moved to `actions/checkout@v5`, `actions/setup-node@v5` and `actions/upload-artifact@v5`, which run on Node 24 instead of the deprecated Node 20.
+
 ## [0.1.0] - 2026-10-13
 
 ### Added — ⚡ First release

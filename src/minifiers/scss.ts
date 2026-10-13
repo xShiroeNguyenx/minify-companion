@@ -1,7 +1,8 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import * as sass from 'sass';
-import { expandedCssPath, relativeFromMap, toPosix } from '../core/paths';
+import { expandedCssPath, isInside, relativeFromMap, samePath, toPosix } from '../core/paths';
 import { errorMessage, withSourceMapComment } from '../core/issues';
 import type { Issue, MinifyInput, MinifyResult, OutputFile } from '../core/types';
 
@@ -16,13 +17,43 @@ function fileUrlToPosix(url: URL | string): string | undefined {
   return toPosix(fileURLToPath(u));
 }
 
+function realPosix(p: string): string | undefined {
+  try {
+    return toPosix(fs.realpathSync.native(p));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Sass corrects the spelling of every path it loads to the name on disk, so on Windows an 8.3
+ * short folder (`C:/Users/RUNNER~1/...`) comes back long (`C:/Users/runneradmin/...`). Everything
+ * else here — the output path, the editor's URIs, the dependency graph — uses the spelling the
+ * user opened, so map each reported path back onto the deepest ancestor of the source that
+ * resolves to the same place. Paths that already match, or share no ancestor, pass through.
+ */
+export function toSourceSpelling(reported: string, srcPath: string): string {
+  let dir = path.posix.dirname(srcPath);
+  if (isInside(reported, dir)) return reported;
+  for (;;) {
+    const real = realPosix(dir);
+    if (real && isInside(reported, real)) {
+      return dir.replace(/\/+$/, '') + reported.slice(real.replace(/\/+$/, '').length);
+    }
+    const parent = path.posix.dirname(dir);
+    if (parent === dir) return reported;
+    dir = parent;
+  }
+}
+
 /** Sass reports 0-based spans; the span's url names the file, which may be a partial. */
 function issueFromSpan(message: string, span: sass.SourceSpan | undefined, srcPath: string): Issue {
   if (!span) return { message };
-  const file = span.url ? fileUrlToPosix(span.url) : undefined;
+  const reported = span.url ? fileUrlToPosix(span.url) : undefined;
+  const file = reported ? toSourceSpelling(reported, srcPath) : undefined;
   return {
     message,
-    file: file && toPosix(file) !== srcPath ? file : undefined,
+    file: file && !samePath(file, srcPath) ? file : undefined,
     line: span.start.line + 1,
     column: span.start.column + 1,
   };
@@ -66,7 +97,7 @@ export async function minifyScss(input: MinifyInput, options: ScssOptions): Prom
       const map = { ...result.sourceMap } as { sources: string[]; sourceRoot?: string; file?: string };
       map.sources = map.sources.map((s) => {
         const file = s.startsWith('file:') ? fileUrlToPosix(s) : undefined;
-        return file ? relativeFromMap(mapPath, file) : s;
+        return file ? relativeFromMap(mapPath, toSourceSpelling(file, srcPath)) : s;
       });
       delete map.sourceRoot;
       map.file = path.posix.basename(outPath);
@@ -83,7 +114,9 @@ export async function minifyScss(input: MinifyInput, options: ScssOptions): Prom
 
     const dependencies = result.loadedUrls
       .map((u) => fileUrlToPosix(u))
-      .filter((p): p is string => !!p && p.toLowerCase() !== srcPath.toLowerCase());
+      .filter((p): p is string => !!p)
+      .map((p) => toSourceSpelling(p, srcPath))
+      .filter((p) => !samePath(p, srcPath));
 
     return { ok: true, outputs, warnings, dependencies };
   } catch (error) {

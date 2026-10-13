@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -237,6 +238,73 @@ describe('minifyScss', () => {
   it('collects Sass warnings', async () => {
     const r = ok(await minifyScss(inp(`${dir}/main.scss`, '@warn "careful";\n.a{color:red}'), { loadPaths: [] }));
     expect(r.warnings[0].message).toContain('careful');
+  });
+});
+
+// Sass reports files by their real path. A project opened through a symlink, a Windows junction
+// or an 8.3 short name (os.tmpdir() on GitHub's Windows runners) must still get paths in the form
+// the editor uses, or maps point at `../../real/...` and partial errors land on an unopened URI.
+describe('minifyScss through a linked folder', () => {
+  let real: string;
+  let link: string;
+  beforeAll(() => {
+    real = toPosix(fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mc-real-'))));
+    fs.mkdirSync(`${real}/site/partials`, { recursive: true });
+    fs.writeFileSync(`${real}/site/partials/_vars.scss`, '$brand: #ff0000;\n');
+    fs.writeFileSync(`${real}/site/_broken.scss`, '.x { color: $missing; }\n');
+    link = `${real}-link`;
+    fs.symlinkSync(`${real}/site`, link, process.platform === 'win32' ? 'junction' : 'dir');
+  });
+  afterAll(() => {
+    fs.rmSync(link, { force: true, recursive: false });
+    fs.rmSync(real, { recursive: true, force: true });
+  });
+
+  it('reports dependencies in the linked form', async () => {
+    const r = ok(await minifyScss(inp(`${link}/main.scss`, '@use "partials/vars";\n.a{color:vars.$brand}'), { loadPaths: [] }));
+    expect(r.dependencies).toEqual([`${link}/partials/_vars.scss`]);
+  });
+
+  it('writes map sources relative to the linked folder', async () => {
+    const r = ok(await minifyScss(inp(`${link}/main.scss`, '@use "partials/vars";\n.a{color:vars.$brand}', { sourceMap: true }), { loadPaths: [] }));
+    expect(JSON.parse(r.outputs[1].content).sources.sort()).toEqual(['main.scss', 'partials/_vars.scss']);
+  });
+
+  it('attributes errors in the entry to the entry, and in a partial to the linked partial', async () => {
+    const own = await minifyScss(inp(`${link}/main.scss`, '.a { color: $nope; }'), { loadPaths: [] });
+    expect(own.ok === false && own.errors[0].file).toBeUndefined();
+    const partial = await minifyScss(inp(`${link}/main.scss`, '@use "broken";'), { loadPaths: [] });
+    expect(partial.ok === false && partial.errors[0].file).toBe(`${link}/_broken.scss`);
+  });
+});
+
+/** The 8.3 short form of a Windows path, or undefined where short names are not generated. */
+function shortPath(p: string): string | undefined {
+  if (process.platform !== 'win32') return undefined;
+  const out = execSync(`cmd /c for %I in ("${p.replace(/\//g, '\\')}") do @echo %~sI`, { encoding: 'utf8' }).trim();
+  return out && toPosix(out).toLowerCase() !== toPosix(p).toLowerCase() ? toPosix(out) : undefined;
+}
+
+// What GitHub's Windows runners do: os.tmpdir() is C:\Users\RUNNER~1\..., and Sass corrects the
+// spelling of every path it loads to the long name.
+describe('minifyScss under an 8.3 short path', () => {
+  const long = toPosix(fs.mkdtempSync(path.join(os.tmpdir(), 'mc-long-folder-name-')));
+  fs.mkdirSync(`${long}/partials`);
+  fs.writeFileSync(`${long}/partials/_vars.scss`, '$brand: #ff0000;\n');
+  fs.writeFileSync(`${long}/_broken.scss`, '.x { color: $missing; }\n');
+  const short = shortPath(long);
+  afterAll(() => fs.rmSync(long, { recursive: true, force: true }));
+
+  it.skipIf(!short)('keeps dependencies, map sources and error files in the short form', async () => {
+    const dir = short!;
+    const r = ok(await minifyScss(inp(`${dir}/main.scss`, '@use "partials/vars";\n.a{color:vars.$brand}', { sourceMap: true }), { loadPaths: [] }));
+    expect(r.dependencies).toEqual([`${dir}/partials/_vars.scss`]);
+    expect(JSON.parse(r.outputs[1].content).sources.sort()).toEqual(['main.scss', 'partials/_vars.scss']);
+
+    const own = await minifyScss(inp(`${dir}/main.scss`, '.a { color: $nope; }'), { loadPaths: [] });
+    expect(own.ok === false && own.errors[0].file).toBeUndefined();
+    const partial = await minifyScss(inp(`${dir}/main.scss`, '@use "broken";'), { loadPaths: [] });
+    expect(partial.ok === false && partial.errors[0].file).toBe(`${dir}/_broken.scss`);
   });
 });
 

@@ -6,7 +6,7 @@ Edit `style.css`, press <kbd>Ctrl</kbd>+<kbd>S</kbd>, and `style.min.css` is up 
 
 Minify Companion minifies **CSS, JavaScript and HTML** and compiles **SCSS / Sass** every time you save, writing the result next to the source. It runs entirely inside VS Code, offline, and never sends your code anywhere.
 
-**Current version:** v0.1.0
+**Current version:** v0.1.1
 
 ## Features
 

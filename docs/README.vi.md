@@ -6,7 +6,7 @@ Sửa `style.css`, bấm <kbd>Ctrl</kbd>+<kbd>S</kbd>, `style.min.css` đã đư
 
 Minify Companion minify **CSS, JavaScript, HTML** và biên dịch **SCSS / Sass** mỗi lần bạn lưu, ghi kết quả ngay cạnh file nguồn. Mọi thứ chạy trong VS Code, offline, không gửi code đi đâu.
 
-**Phiên bản hiện tại:** v0.1.0
+**Phiên bản hiện tại:** v0.1.1
 
 ## Tính năng
 
