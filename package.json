@@ -1,0 +1,290 @@
+{
+  "name": "minify-companion",
+  "displayName": "Minify Companion",
+  "description": "%extension.description%",
+  "version": "0.1.0",
+  "publisher": "shiroenguyen",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Formatters",
+    "Other"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xShiroeNguyenx/minify-companion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xShiroeNguyenx/minify-companion/issues"
+  },
+  "homepage": "https://github.com/xShiroeNguyenx/minify-companion#readme",
+  "qna": "marketplace",
+  "keywords": [
+    "minify",
+    "minifier",
+    "uglify",
+    "terser",
+    "css",
+    "javascript",
+    "html",
+    "scss",
+    "sass",
+    "compress",
+    "on save",
+    "source map"
+  ],
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#000000",
+    "theme": "dark"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "%capabilities.untrusted%",
+      "restrictedConfigurations": [
+        "minifyCompanion.outputPattern",
+        "minifyCompanion.js.terser",
+        "minifyCompanion.css.cleancss",
+        "minifyCompanion.html.options",
+        "minifyCompanion.scss.loadPaths"
+      ]
+    },
+    "virtualWorkspaces": false
+  },
+  "activationEvents": [
+    "onLanguage:css",
+    "onLanguage:javascript",
+    "onLanguage:html",
+    "onLanguage:scss",
+    "onLanguage:sass"
+  ],
+  "main": "./dist/extension.js",
+  "l10n": "./l10n",
+  "contributes": {
+    "commands": [
+      {
+        "command": "minifyCompanion.minifyCurrent",
+        "title": "%command.minifyCurrent%",
+        "category": "Minify"
+      },
+      {
+        "command": "minifyCompanion.minifySelected",
+        "title": "%command.minifySelected%",
+        "category": "Minify"
+      },
+      {
+        "command": "minifyCompanion.minifyWorkspace",
+        "title": "%command.minifyWorkspace%",
+        "category": "Minify"
+      },
+      {
+        "command": "minifyCompanion.toggleAuto",
+        "title": "%command.toggleAuto%",
+        "category": "Minify"
+      },
+      {
+        "command": "minifyCompanion.showOutput",
+        "title": "%command.showOutput%",
+        "category": "Minify"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "minifyCompanion.minifyCurrent",
+          "when": "resourceExtname =~ /^\\.(css|js|mjs|cjs|html|htm|scss|sass)$/ && !(resourceFilename =~ /\\.min\\.[a-z]+$/)"
+        },
+        {
+          "command": "minifyCompanion.minifySelected",
+          "when": "false"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "minifyCompanion.minifySelected",
+          "when": "explorerResourceIsFolder || resourceExtname =~ /^\\.(css|js|mjs|cjs|html|htm|scss|sass)$/ && !(resourceFilename =~ /\\.min\\.[a-z]+$/)",
+          "group": "7_modification@90"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "minifyCompanion.minifyCurrent",
+          "when": "resourceExtname =~ /^\\.(css|js|mjs|cjs|html|htm|scss|sass)$/ && !(resourceFilename =~ /\\.min\\.[a-z]+$/)",
+          "group": "1_modification@90"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "minifyCompanion.minifyCurrent",
+          "when": "resourceExtname =~ /^\\.(css|js|mjs|cjs|html|htm|scss|sass)$/ && !(resourceFilename =~ /\\.min\\.[a-z]+$/)",
+          "group": "1_modification@90"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Minify Companion",
+      "properties": {
+        "minifyCompanion.onSave": {
+          "type": "string",
+          "enum": [
+            "ifMinExists",
+            "always",
+            "off"
+          ],
+          "enumDescriptions": [
+            "%config.onSave.ifMinExists%",
+            "%config.onSave.always%",
+            "%config.onSave.off%"
+          ],
+          "default": "ifMinExists",
+          "scope": "resource",
+          "description": "%config.onSave%"
+        },
+        "minifyCompanion.languages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "css",
+              "javascript",
+              "html",
+              "scss"
+            ]
+          },
+          "uniqueItems": true,
+          "default": [
+            "css",
+            "javascript",
+            "html",
+            "scss"
+          ],
+          "scope": "resource",
+          "description": "%config.languages%"
+        },
+        "minifyCompanion.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/node_modules/**",
+            "**/vendor/**",
+            "**/dist/**",
+            "**/*.min.*"
+          ],
+          "scope": "resource",
+          "description": "%config.exclude%"
+        },
+        "minifyCompanion.outputPattern": {
+          "type": "string",
+          "default": "${dir}/${name}.min.${ext}",
+          "scope": "resource",
+          "markdownDescription": "%config.outputPattern%"
+        },
+        "minifyCompanion.sourceMap": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "%config.sourceMap%"
+        },
+        "minifyCompanion.preserveLicenseComments": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "%config.preserveLicenseComments%"
+        },
+        "minifyCompanion.js.terser": {
+          "type": "object",
+          "default": {},
+          "scope": "resource",
+          "markdownDescription": "%config.js.terser%"
+        },
+        "minifyCompanion.css.cleancss": {
+          "type": "object",
+          "default": {
+            "level": 1
+          },
+          "scope": "resource",
+          "markdownDescription": "%config.css.cleancss%"
+        },
+        "minifyCompanion.html.options": {
+          "type": "object",
+          "default": {},
+          "scope": "resource",
+          "markdownDescription": "%config.html.options%"
+        },
+        "minifyCompanion.scss.emitCss": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "%config.scss.emitCss%"
+        },
+        "minifyCompanion.scss.loadPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "resource",
+          "description": "%config.scss.loadPaths%"
+        },
+        "minifyCompanion.statusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.statusBar%"
+        },
+        "minifyCompanion.maxFileSizeKB": {
+          "type": "number",
+          "default": 5120,
+          "minimum": 1,
+          "scope": "resource",
+          "description": "%config.maxFileSizeKB%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "package": "vsce package",
+    "package:install": "vsce package && \"%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\bin\\code.cmd\" --install-extension \"%npm_package_name%-%npm_package_version%.vsix\" --force",
+    "publish:vsce": "vsce publish",
+    "publish:ovsx": "ovsx publish \"%npm_package_name%-%npm_package_version%.vsix\"",
+    "test:integration": "node esbuild.mjs && node test/integration/runTest.mjs"
+  },
+  "dependencies": {
+    "clean-css": "^5.3.3",
+    "html-minifier-terser": "^7.2.0",
+    "picomatch": "^4.0.7",
+    "sass": "~1.99.0",
+    "terser": "^5.51.2"
+  },
+  "devDependencies": {
+    "@types/clean-css": "^4.2.11",
+    "@types/html-minifier-terser": "^7.0.2",
+    "@types/node": "^20.19.43",
+    "@types/picomatch": "^4.0.3",
+    "@types/vscode": "~1.85.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.2",
+    "@typescript-eslint/parser": "^8.71.2",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.25.12",
+    "eslint": "^8.57.1",
+    "ovsx": "^1.2.0",
+    "typescript": "~5.6.3",
+    "vitest": "^4.1.11"
+  }
+}

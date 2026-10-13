@@ -1,0 +1,18 @@
+node_modules/
+dist/
+*.vsix
+
+.claude/
+.vscode-test/
+.tmp-npm-cache/
+
+# Local secrets — OVSX_PAT, VSCE_PAT, etc. Never commit.
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+
+.DS_Store
+Thumbs.db
