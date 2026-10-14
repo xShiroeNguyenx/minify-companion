@@ -6,6 +6,7 @@
   "command.minifyWorkspace": "Minify All in Workspace",
   "command.toggleAuto": "Toggle Minify on Save",
   "command.showOutput": "Show Output",
+  "command.openSettings": "Open Settings",
   "config.onSave": "When saving a file minifies it.",
   "config.onSave.ifMinExists": "Only update a .min file that already exists. Create it the first time with 'Minify Current File' or the Explorer menu.",
   "config.onSave.always": "Always create or update the .min file.",

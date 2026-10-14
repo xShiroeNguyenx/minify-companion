@@ -51,6 +51,8 @@ export type MinifyResult =
       warnings: Issue[];
       /** Files the source pulled in (Sass), absolute POSIX-style, the source itself excluded. */
       dependencies?: string[];
+      /** Gzipped size of the minified file (the first output), in bytes. */
+      gzipSize?: number;
     }
   | { ok: false; errors: Issue[] };
 

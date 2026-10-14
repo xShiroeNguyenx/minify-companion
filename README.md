@@ -43,11 +43,14 @@ Files named `*.min.*` and Sass partials (`_*.scss`) are never treated as sources
 | `Minify` (Explorer right-click) | Minify the selected files, or every supported file in the selected folders |
 | `Minify: Minify All in Workspace` | Minify every supported file (asks first above 50 files; can be cancelled) |
 | `Minify: Toggle Minify on Save` | Turn minify on save off or back on for this workspace |
+| `Minify: Open Settings` | A settings screen for every option, for your user or this workspace |
 | `Minify: Show Output` | Open the log: sizes, timings, errors |
 
-The status bar shows the last result (`⚡ style.min.css −67%`); click it to open the log.
+The status bar shows the last result (`⚡ style.min.css −67%`); click it to open the log. Its tooltip adds the gzipped size and links to the log and the settings screen.
 
 ## Settings
+
+`Minify: Open Settings` opens a screen with every option below. Pick **User** (every project) or **Workspace** (this project, saved in `.vscode/settings.json`) at the top. Each changed option has a **Reset** link, the output path shows where the open file and a few samples would go as you type, and minifier options are checked as JSON before they are saved. You can still edit `settings.json` directly:
 
 | Setting | Default | Description |
 |---|---|---|

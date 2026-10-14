@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "preserve",
     "target": "ES2022",
     "lib": ["ES2022"],
     "types": ["node", "vscode"],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "rootDir": "src",
     "strict": true,
     "noUnusedLocals": true,
@@ -15,5 +15,5 @@
     "isolatedModules": true
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", ".vscode-test"]
+  "exclude": ["node_modules", "dist", ".vscode-test", "src/webview"]
 }

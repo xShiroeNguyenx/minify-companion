@@ -18,8 +18,9 @@ import { exists, writeIfChanged } from './writer';
 
 export type RunOutcome =
   | { kind: 'skipped'; reason: SkipReason }
-  | { kind: 'ok'; outPath: string; before: number; after: number; written: boolean; ms: number }
-  | { kind: 'failed'; message: string }
+  | { kind: 'ok'; outPath: string; before: number; after: number; written: boolean; ms: number; gzip?: number }
+  /** `settings`: caused by a setting, so the fix is in the settings screen. */
+  | { kind: 'failed'; message: string; settings?: boolean }
   /** A partial was saved; this many entries were queued for recompiling. */
   | { kind: 'dependents'; count: number }
   /** Another save of the same file came in and its run replaced this one. */
@@ -37,6 +38,8 @@ export class Engine implements vscode.Disposable {
   private readonly pool: WorkerPool<WorkerRequest, MinifyResult>;
   /** A failed save pops up once per session; after that the status bar and Problems carry it. */
   private savePopupShown = false;
+  /** Invalid settings pop up once per session too; the log lists each one. */
+  private configPopupShown = false;
 
   constructor(
     private readonly log: vscode.LogOutputChannel,
@@ -51,10 +54,21 @@ export class Engine implements vscode.Disposable {
   readConfig(uri: vscode.Uri): MinifyConfig {
     const section = vscode.workspace.getConfiguration('minifyCompanion', uri);
     const { config, warnings } = normalizeConfig((key) => section.get(key));
-    for (const w of warnings) {
-      if (this.configWarningsShown.has(w)) continue;
+    const fresh = warnings.filter((w) => !this.configWarningsShown.has(w));
+    for (const w of fresh) {
       this.configWarningsShown.add(w);
       this.log.warn(w);
+    }
+    if (fresh.length && !this.configPopupShown) {
+      // Otherwise a hand-edited "sourceMap": "yes" just quietly does nothing.
+      this.configPopupShown = true;
+      const keys = fresh.map((w) => /^minifyCompanion.[w.]+/.exec(w)?.[0] ?? w);
+      const open = vscode.l10n.t('Open Settings');
+      void vscode.window
+        .showWarningMessage(vscode.l10n.t('These settings have invalid values, so their defaults are used: {0}.', keys.join(', ')), open)
+        .then((answer) => {
+          if (answer === open) void vscode.commands.executeCommand('minifyCompanion.openSettings');
+        });
     }
     return config;
   }
@@ -88,8 +102,8 @@ export class Engine implements vscode.Disposable {
       const message = vscode.l10n.t('Invalid minifyCompanion.outputPattern: {0}', target.reason);
       this.log.error(`${src}: ${message}`);
       this.status.failure(src, message);
-      this.popupOnFirstSaveFailure(trigger, src, message);
-      return { kind: 'failed', message };
+      this.popupOnFirstSaveFailure(trigger, src, message, true);
+      return { kind: 'failed', message, settings: true };
     }
     const outUri = vscode.Uri.file(target.path);
 
@@ -165,12 +179,13 @@ export class Engine implements vscode.Disposable {
 
     const before = byteLength(code);
     const after = byteLength(result.outputs[0].content);
-    this.status.success(target.path, before, after, ms, written);
+    const gzip = result.gzipSize;
+    this.status.success(target.path, before, after, ms, written, gzip);
     this.log.info(
       `${src} → ${path.posix.basename(target.path)}: ${formatBytes(before)} → ${formatBytes(after)} ` +
-        `(${formatSaving(before, after)}) in ${ms} ms${written ? '' : ', unchanged'}`,
+        `(${formatSaving(before, after)}${gzip === undefined ? '' : `, gzip ${formatBytes(gzip)}`}) in ${ms} ms${written ? '' : ', unchanged'}`,
     );
-    return { kind: 'ok', outPath: target.path, before, after, written, ms };
+    return { kind: 'ok', outPath: target.path, before, after, written, ms, gzip };
   }
 
   private fail(src: string, uri: vscode.Uri, trigger: Trigger, errors: Issue[], toProblems = true): RunOutcome {
@@ -191,14 +206,17 @@ export class Engine implements vscode.Disposable {
    * ones do not: a file saved every few seconds while being fixed would otherwise nag. Commands
    * report their own failures.
    */
-  private popupOnFirstSaveFailure(trigger: Trigger, src: string, message: string): void {
+  private popupOnFirstSaveFailure(trigger: Trigger, src: string, message: string, fromSettings = false): void {
     if (trigger !== 'save' || this.savePopupShown) return;
     this.savePopupShown = true;
     const show = vscode.l10n.t('Show Output');
+    const open = vscode.l10n.t('Open Settings');
+    const buttons = fromSettings ? [open, show] : [show];
     void vscode.window
-      .showErrorMessage(vscode.l10n.t('Minify failed for {0}: {1} The previous output was kept.', path.posix.basename(src), message), show)
+      .showErrorMessage(vscode.l10n.t('Minify failed for {0}: {1} The previous output was kept.', path.posix.basename(src), message), ...buttons)
       .then((answer) => {
         if (answer === show) this.log.show(true);
+        else if (answer === open) void vscode.commands.executeCommand('minifyCompanion.openSettings');
       });
   }
 

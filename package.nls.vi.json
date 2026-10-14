@@ -6,6 +6,7 @@
   "command.minifyWorkspace": "Minify toàn bộ workspace",
   "command.toggleAuto": "Bật/tắt minify khi lưu",
   "command.showOutput": "Mở Output",
+  "command.openSettings": "Mở cài đặt",
   "config.onSave": "Khi nào việc lưu file sẽ minify nó.",
   "config.onSave.ifMinExists": "Chỉ cập nhật file .min đã có sẵn. Lần đầu tạo bằng 'Minify file hiện tại' hoặc menu chuột phải trong Explorer.",
   "config.onSave.always": "Luôn tạo hoặc cập nhật file .min.",

@@ -19,7 +19,7 @@ const ON_SAVE: OnSaveMode[] = ['ifMinExists', 'always', 'off'];
 const LANGS: Lang[] = ['css', 'javascript', 'html', 'scss'];
 
 /** Setting keys under `minifyCompanion.`, mapped to the field they fill. */
-const KEYS: Record<keyof MinifyConfig, string> = {
+export const KEYS: Record<keyof MinifyConfig, string> = {
   onSave: 'onSave',
   languages: 'languages',
   exclude: 'exclude',
@@ -37,6 +37,26 @@ const KEYS: Record<keyof MinifyConfig, string> = {
 const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
+const isBoolean = (v: unknown) => typeof v === 'boolean';
+
+/** What a valid value looks like for each MinifyConfig field. Shared with the settings screen. */
+export const VALIDATORS: Record<keyof MinifyConfig, (v: unknown) => boolean> = {
+  onSave: (v) => ON_SAVE.includes(v as OnSaveMode),
+  languages: (v) => isStringArray(v) && v.every((l) => LANGS.includes(l as Lang)),
+  exclude: isStringArray,
+  outputPattern: (v) => typeof v === 'string' && v.trim() !== '',
+  sourceMap: isBoolean,
+  preserveLicenseComments: isBoolean,
+  terser: isPlainObject,
+  cleancss: isPlainObject,
+  html: isPlainObject,
+  scssEmitCss: isBoolean,
+  scssLoadPaths: isStringArray,
+  maxFileSizeKB: (v) => typeof v === 'number' && Number.isFinite(v) && v > 0,
+};
+
+/** Setting key under `minifyCompanion.` → the MinifyConfig field it fills. */
+export const FIELD_BY_KEY = Object.fromEntries(Object.entries(KEYS).map(([field, key]) => [key, field])) as Record<string, keyof MinifyConfig>;
 
 export interface NormalizedConfig {
   config: MinifyConfig;
@@ -53,32 +73,19 @@ export function normalizeConfig(get: (key: string) => unknown): NormalizedConfig
   const warnings: string[] = [];
   const config: MinifyConfig = { ...DEFAULT_CONFIG };
 
-  const take = <K extends keyof MinifyConfig>(field: K, valid: (v: unknown) => boolean) => {
+  for (const field of Object.keys(KEYS) as Array<keyof MinifyConfig>) {
     const key = KEYS[field];
     const value = get(key);
-    if (value === undefined || value === null) return;
-    if (valid(value)) {
+    if (value === undefined || value === null) continue;
+    if (VALIDATORS[field](value)) {
       // VS Code hands out objects and arrays from settings as read-only proxies, which cannot be
       // posted to a worker thread ("could not be cloned"). Settings are JSON, so a JSON round
       // trip gives plain data.
-      config[field] = (typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value) as MinifyConfig[K];
+      (config as unknown as Record<string, unknown>)[field] = typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value;
     } else {
       warnings.push(`minifyCompanion.${key} has an invalid value (${JSON.stringify(value)}); using the default.`);
     }
-  };
-
-  take('onSave', (v) => ON_SAVE.includes(v as OnSaveMode));
-  take('languages', (v) => isStringArray(v) && v.every((l) => LANGS.includes(l as Lang)));
-  take('exclude', isStringArray);
-  take('outputPattern', (v) => typeof v === 'string' && v.trim() !== '');
-  take('sourceMap', (v) => typeof v === 'boolean');
-  take('preserveLicenseComments', (v) => typeof v === 'boolean');
-  take('terser', isPlainObject);
-  take('cleancss', isPlainObject);
-  take('html', isPlainObject);
-  take('scssEmitCss', (v) => typeof v === 'boolean');
-  take('scssLoadPaths', isStringArray);
-  take('maxFileSizeKB', (v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  }
 
   return { config, warnings };
 }

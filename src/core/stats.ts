@@ -1,3 +1,5 @@
+import { gzipSync } from 'zlib';
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const kb = bytes / 1024;
@@ -15,6 +17,15 @@ export function savingPercent(before: number, after: number): number {
 export function formatSaving(before: number, after: number): string {
   const pct = savingPercent(before, after);
   return pct >= 0 ? `−${pct}%` : `+${-pct}%`;
+}
+
+/**
+ * Size of the text gzipped at the default level (6), roughly what a web server sends. Brotli at
+ * its static level (11) would be closer to a CDN's, but takes seconds on a 1 MB file: too slow to
+ * run on every save.
+ */
+export function gzipSize(text: string): number {
+  return gzipSync(Buffer.from(text, 'utf8')).length;
 }
 
 /** UTF-8 byte length, which is what ends up on disk. */

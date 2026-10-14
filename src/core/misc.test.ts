@@ -3,7 +3,7 @@ import { locateHtmlError, parseCleanCssMessage, positionOf, stripSourceMapCommen
 import { isMinFile, isSassPartial, langFromPath, outputExtension } from './lang';
 import { KeyedQueue, runPool } from './queue';
 import { ScssGraph } from './scssGraph';
-import { byteLength, formatBytes, formatSaving, savingPercent, stripBom } from './stats';
+import { byteLength, formatBytes, formatSaving, gzipSize, savingPercent, stripBom } from './stats';
 
 describe('lang', () => {
   it('maps extensions case-insensitively', () => {
@@ -41,6 +41,14 @@ describe('stats', () => {
     expect(savingPercent(100, 120)).toBe(-20);
     expect(formatSaving(1000, 330)).toBe('−67%');
     expect(formatSaving(21, 55)).toBe('+162%');
+  });
+
+  it('measures the gzipped size, which is smaller for repetitive text', () => {
+    const text = '.a{color:red}'.repeat(500);
+    const size = gzipSize(text);
+    expect(size).toBeGreaterThan(0);
+    expect(size).toBeLessThan(byteLength(text) / 10);
+    expect(gzipSize('')).toBeGreaterThan(0); // the gzip header alone
   });
 
   it('counts UTF-8 bytes and strips a BOM', () => {

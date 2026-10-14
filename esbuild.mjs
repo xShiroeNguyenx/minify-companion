@@ -23,9 +23,22 @@ const ctx = await esbuild.context({
   logLevel: 'info',
 });
 
+// - settings.js: the script of the settings webview, which runs in a browser page.
+const webview = await esbuild.context({
+  entryPoints: ['src/webview/settings.ts'],
+  bundle: true,
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2022',
+  outdir: 'dist',
+  minify: production,
+  sourcemap: !production,
+  logLevel: 'info',
+});
+
 if (watch) {
-  await ctx.watch();
+  await Promise.all([ctx.watch(), webview.watch()]);
 } else {
-  await ctx.rebuild();
-  await ctx.dispose();
+  await Promise.all([ctx.rebuild(), webview.rebuild()]);
+  await Promise.all([ctx.dispose(), webview.dispose()]);
 }

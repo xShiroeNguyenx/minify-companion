@@ -43,11 +43,14 @@ File tên `*.min.*` và Sass partial (`_*.scss`) không bao giờ được coi l
 | `Minify` (chuột phải trong Explorer) | Minify các file đã chọn, hoặc mọi file được hỗ trợ trong thư mục đã chọn |
 | `Minify: Minify toàn bộ workspace` | Minify mọi file được hỗ trợ (hỏi trước nếu hơn 50 file; huỷ được) |
 | `Minify: Bật/tắt minify khi lưu` | Tắt hoặc bật lại minify khi lưu cho workspace này |
+| `Minify: Mở cài đặt` | Màn hình cài đặt mọi option, cho User hoặc riêng workspace này |
 | `Minify: Mở Output` | Mở log: kích thước, thời gian, lỗi |
 
-Thanh trạng thái hiện kết quả gần nhất (`⚡ style.min.css −67%`), bấm vào để mở log.
+Thanh trạng thái hiện kết quả gần nhất (`⚡ style.min.css −67%`), bấm vào để mở log. Tooltip của nó có thêm kích thước sau gzip và link tới log, màn hình cài đặt.
 
 ## Cài đặt
+
+`Minify: Mở cài đặt` mở một màn hình chứa mọi option bên dưới. Chọn **User** (mọi project) hoặc **Workspace** (riêng project này, lưu trong `.vscode/settings.json`) ở trên cùng. Option nào đã sửa có link **Đặt lại**, ô đường dẫn file đích hiện ngay file đang mở và vài file mẫu sẽ được ghi vào đâu khi bạn gõ, còn option của minifier được kiểm tra JSON trước khi lưu. Vẫn có thể sửa thẳng `settings.json`:
 
 | Setting | Mặc định | Mô tả |
 |---|---|---|

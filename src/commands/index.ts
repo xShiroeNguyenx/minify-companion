@@ -6,6 +6,7 @@ import { runPool } from '../core/queue';
 import { formatBytes, formatSaving } from '../core/stats';
 import type { Trigger } from '../core/types';
 import { MAX_PARALLEL, type Engine, type RunOutcome } from '../runtime/engine';
+import { SettingsPanel } from '../runtime/settingsPanel';
 
 /** Asking before a batch this large: it may create a lot of files. */
 const CONFIRM_ABOVE = 50;
@@ -41,6 +42,7 @@ export function registerCommands(context: vscode.ExtensionContext, engine: Engin
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   reg('minifyCompanion.showOutput', () => log.show(true));
+  reg('minifyCompanion.openSettings', () => SettingsPanel.show(context));
 
   reg('minifyCompanion.minifyCurrent', async (arg?: vscode.Uri) => {
     const uri = arg instanceof vscode.Uri ? arg : vscode.window.activeTextEditor?.document.uri;
@@ -54,6 +56,8 @@ export function registerCommands(context: vscode.ExtensionContext, engine: Engin
     }
     const outcome = await engine.run(uri, 'explicit', openText(uri));
     reportSingle(outcome, log);
+    // Returned for tests and for anyone chaining the command.
+    return outcome;
   });
 
   reg('minifyCompanion.minifySelected', async (clicked?: vscode.Uri, selected?: vscode.Uri[]) => {
@@ -131,13 +135,22 @@ function reportSingle(outcome: RunOutcome, log: vscode.LogOutputChannel): void {
   switch (outcome.kind) {
     case 'ok': {
       const msg = outcome.written
-        ? vscode.l10n.t(
-            '{0}: {1} → {2} ({3})',
-            path.posix.basename(outcome.outPath),
-            formatBytes(outcome.before),
-            formatBytes(outcome.after),
-            formatSaving(outcome.before, outcome.after),
-          )
+        ? outcome.gzip === undefined
+          ? vscode.l10n.t(
+              '{0}: {1} → {2} ({3})',
+              path.posix.basename(outcome.outPath),
+              formatBytes(outcome.before),
+              formatBytes(outcome.after),
+              formatSaving(outcome.before, outcome.after),
+            )
+          : vscode.l10n.t(
+              '{0}: {1} → {2} ({3}), gzip {4}',
+              path.posix.basename(outcome.outPath),
+              formatBytes(outcome.before),
+              formatBytes(outcome.after),
+              formatSaving(outcome.before, outcome.after),
+              formatBytes(outcome.gzip),
+            )
         : vscode.l10n.t('{0} is already up to date.', path.posix.basename(outcome.outPath));
       vscode.window.setStatusBarMessage(`$(check) ${msg}`, 4000);
       break;
@@ -145,9 +158,19 @@ function reportSingle(outcome: RunOutcome, log: vscode.LogOutputChannel): void {
     case 'skipped':
       void vscode.window.showInformationMessage(skipText(outcome.reason));
       break;
-    case 'failed':
-      void showOutputOn(vscode.window.showErrorMessage(vscode.l10n.t('Minify failed: {0}', outcome.message), vscode.l10n.t('Show Output')), log);
+    case 'failed': {
+      const open = vscode.l10n.t('Open Settings');
+      const message = vscode.l10n.t('Minify failed: {0}', outcome.message);
+      if (outcome.settings) {
+        void vscode.window.showErrorMessage(message, open, vscode.l10n.t('Show Output')).then((answer) => {
+          if (answer === open) void vscode.commands.executeCommand('minifyCompanion.openSettings');
+          else if (answer) log.show(true);
+        });
+      } else {
+        void showOutputOn(vscode.window.showErrorMessage(message, vscode.l10n.t('Show Output')), log);
+      }
       break;
+    }
     default:
       break;
   }

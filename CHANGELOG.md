@@ -3,6 +3,26 @@
 Tài liệu này theo format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 extension áp dụng [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-14
+
+### Added — ⚙️ A settings screen
+
+- **`Minify: Open Settings` opens one screen with every option**, grouped into *On save*, *Output*, *Sass / SCSS* and *Minifier options*, so there is no need to hunt through `settings.json` ([src/runtime/settingsPanel.ts](src/runtime/settingsPanel.ts)).
+  - **User or Workspace, chosen at the top.** Each option says where its value comes from (default, your User value, or this workspace), warns when a workspace value wins over the User one, and has a **Reset** link once changed.
+  - **The output path shows where files would go while you type**, starting with the file open in the editor (`css/style.css → public/css/style.min.css`), inside your real workspace folder. There are one-click presets. A pattern with an unknown variable, one that would overwrite the source, or one that leaves the workspace folder is refused before it is saved. Absolute paths such as `D:/site/public/...` are checked too.
+  - **A value in `settings.json` that VS Code accepts but the extension cannot use** (`"sourceMap": "yes"`) is pointed out under its option, instead of quietly falling back to the default.
+  - **Terser, clean-css and html-minifier-terser options are checked as JSON objects** before saving. Invalid text stays in the box with the parser's message, so it can be fixed instead of retyped.
+  - **Every value is validated in the extension with the same rules used when minifying** ([src/core/settingsForm.ts](src/core/settingsForm.ts)) and read back after writing, so a settings file VS Code cannot write to is reported instead of silently ignored.
+  - **Untrusted workspaces**: the screen says which workspace values are being ignored and links to *Manage Workspace Trust*.
+  - Follows the editor theme; English and Vietnamese.
+- **The settings screen is one click away where you need it**: from the status bar tooltip (next to *Show log*), from the gear menu of the extension in the Extensions view, and from the error message when an invalid `outputPattern` makes a minify fail.
+- **Invalid settings are reported once per session**, with an **Open Settings** button. A hand-edited value of the wrong type used to fall back to the default with only a line in the log ([src/runtime/engine.ts](src/runtime/engine.ts)).
+- **Gzipped size of every output**, in the status bar tooltip, the log and the *Minify Current File* message (`style.min.css: 12.3 KB → 8.1 KB (−34%), gzip 2.0 KB`). That is roughly what a web server sends. It is computed in the worker at the default gzip level and adds about 10 ms for 360 KB. Brotli was left out: at its static level it takes about 2.7 s on a 1 MB file, too slow for every save ([src/core/stats.ts](src/core/stats.ts)).
+
+### Internal
+
+- **`tsconfig.json` uses `"moduleResolution": "bundler"`**, which matches how esbuild actually resolves imports. The old `"node"` (node10) setting is deprecated in TypeScript 6.0 and shows as an error in editors that bundle it.
+
 ## [0.2.0] - 2026-10-13
 
 ### Changed — ⚡ Minifying no longer freezes the editor

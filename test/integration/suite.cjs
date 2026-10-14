@@ -48,8 +48,10 @@ const cases = {
 
   async 'the Minify Current File command creates the .min file'() {
     await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file('css/other.css')));
-    await vscode.commands.executeCommand('minifyCompanion.minifyCurrent');
+    const outcome = await vscode.commands.executeCommand('minifyCompanion.minifyCurrent');
     await waitFor('other.min.css created', () => read('css/other.min.css') === '.o{margin:1px}');
+    assert.strictEqual(outcome.kind, 'ok');
+    assert.ok(outcome.gzip > 0, `gzip size reported (${outcome.gzip})`);
   },
 
   async 'a syntax error keeps the old .min and reports a problem at the right line'() {
@@ -166,6 +168,18 @@ const cases = {
     assert.ok(!fs.existsSync(file('vendor/v.min.js')), 'vendor/** is excluded by default');
     assert.ok(!fs.existsSync(file('scss/_vars.min.css')), 'partials never get an output');
     assert.ok(!fs.existsSync(file('css/style.min.min.css')), '.min files are never sources');
+  },
+
+  async 'Open Settings shows one settings screen, however often it is run'() {
+    const settingsTabs = () =>
+      vscode.window.tabGroups.all
+        .flatMap((g) => g.tabs)
+        .filter((t) => t.input instanceof vscode.TabInputWebview && t.input.viewType.endsWith('minifyCompanion.settings'));
+    await vscode.commands.executeCommand('minifyCompanion.openSettings');
+    await waitFor('settings tab open', () => settingsTabs().length === 1);
+    await vscode.commands.executeCommand('minifyCompanion.openSettings');
+    await sleep(300);
+    assert.strictEqual(settingsTabs().length, 1, 'a second run reveals the open screen');
   },
 };
 

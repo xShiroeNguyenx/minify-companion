@@ -2,7 +2,7 @@
   "name": "minify-companion",
   "displayName": "Minify Companion",
   "description": "%extension.description%",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "shiroenguyen",
   "license": "MIT",
   "engines": {
@@ -89,6 +89,11 @@
         "category": "Minify"
       },
       {
+        "command": "minifyCompanion.openSettings",
+        "title": "%command.openSettings%",
+        "category": "Minify"
+      },
+      {
         "command": "minifyCompanion.showOutput",
         "title": "%command.showOutput%",
         "category": "Minify"
@@ -117,6 +122,13 @@
           "command": "minifyCompanion.minifyCurrent",
           "when": "resourceExtname =~ /^\\.(css|js|mjs|cjs|html|htm|scss|sass)$/ && !(resourceFilename =~ /\\.min\\.[a-z]+$/)",
           "group": "1_modification@90"
+        }
+      ],
+      "extension/context": [
+        {
+          "command": "minifyCompanion.openSettings",
+          "when": "extension == shiroenguyen.minify-companion",
+          "group": "2_configure@0"
         }
       ],
       "editor/context": [
@@ -253,7 +265,7 @@
     "vscode:prepublish": "npm run build",
     "build": "node esbuild.mjs --production",
     "watch": "node esbuild.mjs --watch",
-    "typecheck": "tsc --noEmit -p ./",
+    "typecheck": "tsc --noEmit -p ./ && tsc -p src/webview",
     "lint": "eslint src --ext ts",
     "test": "vitest run",
     "test:watch": "vitest",

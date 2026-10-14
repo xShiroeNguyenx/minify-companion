@@ -3,6 +3,7 @@
 !dist/extension.js.LEGAL.txt
 !dist/worker.js
 !dist/worker.js.LEGAL.txt
+!dist/settings.js
 !package.json
 !package.nls.json
 !package.nls.*.json
